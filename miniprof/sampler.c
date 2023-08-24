@@ -18,18 +18,18 @@ static PyObject* check_threads(PyObject* self) {
       thread = PyInterpreterState_ThreadHead(rt_state);
 
       while (thread) {
+        // PyThreadState_GetFrame and PyFrame_GetBack both return strong
+        // references, so can manage reference count later the same way
         PyFrameObject *frame = PyThreadState_GetFrame(thread);
         if (!frame)
             break;
-        Py_INCREF(frame); // increment the initial one
-
         while (frame) {
             PyCodeObject *code = PyFrame_GetCode(frame);
             Py_XDECREF(code);
 
             // Iterate
             PyFrameObject *prev = PyFrame_GetBack(frame);
-            Py_XDECREF(frame); // GetBack gives ref we need to destroy
+            Py_XDECREF(frame); // give back one strong reference
             frame = prev;
         }
         thread = PyThreadState_Next(thread);
