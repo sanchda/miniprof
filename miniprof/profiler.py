@@ -3,35 +3,46 @@ import threading
 import os
 import shutil
 import sys
-from miniprof import sampler
+import miniprof
+import miniprof.sampler
 
 # Walltime-based sample event
-def sample_event():
+def _sample_event():
+    print("Profiling started.")
     while True:
-        sampler.check_threads()
-        time.sleep(1/10)  # 10hz
+        miniprof.sampler.check_threads()
+        time.sleep(1/100)  # 10hz
 
 
-def file_or_other(p):
+def start():
+    sample_thread = threading.Thread(target=_sample_event)
+    sample_thread.start()
+
+
+def _file_or_other(p):
     if os.path.isfile(p):
         return p
     return shutil.which(p)
 
+def _bootstrap(dir):
+    ppath = os.environ.get("PYTHONPATH", "")
+    if ppath:
+        os.environ["PYTHONPATH"] = f"{dir}:{ppath}"
+    else:
+        os.environ["PYTHONPATH"] = f"{dir}"
+
 
 def main():
-    script_name = sys.argv[0]
-    target = file_or_other(sys.argv[0])
+    target = _file_or_other(sys.argv[1])
+    mod_root = os.path.dirname(miniprof.__file__)
+    _bootstrap(os.path.join(mod_root, "bootstrap"))
+
     if not target:
         print("Error executing command")
     else:
-        print("Profiling started")
-        sample_thread = threading.Thread(target=sample_event)
-        sample_thread.start()
-
         try:
-            os.execl(executable, executable, *sys.argv[1:])
+            os.execl(target, target, *sys.argv[2:])
             sys.exit(0)
         except:
             pass
-
     sys.exit(1)

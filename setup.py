@@ -13,7 +13,7 @@ setup(name = 'miniprof',
       ext_modules = [module],
       entry_points={
           "console_scripts": [
-              "miniprof-exec= miniprof.profiler:main",
+              "miniprof-run= miniprof.profiler:main",
           ],
       },
     packages=find_packages(),
