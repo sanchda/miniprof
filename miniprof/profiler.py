@@ -41,6 +41,7 @@ def main():
         print("Error executing command")
     else:
         try:
+            print(f"Starting {target}")
             os.execl(target, target, *sys.argv[2:])
             sys.exit(0)
         except:
