@@ -23,7 +23,7 @@ static PyObject* check_threads(PyObject* self) {
   if (!initialized) {
     ddup_config_env(get_env_or_default("DD_ENV", "prod"));
     ddup_config_version(get_env_or_default("DD_VERSION", "miniprof_service"));
-    ddup_config_url(get_env_or_default("DD_TRACE_AGENT_URL", "https://localhost:8126"));
+    ddup_config_url(get_env_or_default("DD_TRACE_AGENT_URL", "http://localhost:8126"));
     ddup_config_runtime("python");
     ddup_config_runtime_version(Py_GetVersion());
     ddup_config_profiler_version("ddup_v0.2");

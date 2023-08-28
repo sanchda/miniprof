@@ -20,7 +20,7 @@ else
 fi
 
 # Build ddup into a .so
-g++-11 -std=c++17 -O3 \
+g++-11 -std=c++17 -O3 -fPIC \
   -I$DD_ROOT/libdatadog/include/ \
   -I$DD_ROOT/profiling/include/ \
   $DD_ROOT/profiling/src/* \
@@ -30,3 +30,6 @@ if [ $? -ne 0 ]; then
   echo "Something happened compiling ddup"
   exit 1
 fi
+
+# Build into .a
+ar rcs libuploader.a *.o

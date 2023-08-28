@@ -13,10 +13,10 @@ module = Extension('miniprof.sampler',
                         'vendored/dd-trace-py/ddtrace/internal/datadog/profiling/include',
                     ],
                     extra_objects = [
-                        'interface.o',
-                        'exporter.o',
+                        'libuploader.a',
                         'vendored/dd-trace-py/ddtrace/internal/datadog/libdatadog/lib/libdatadog_profiling.a',
                     ],
+                    libraries=['stdc++'],
                     extra_compile_args=['-std=c11', '-O3']
                 )
 setup(name = 'miniprof',
