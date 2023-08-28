@@ -22,7 +22,8 @@ static PyObject* check_threads(PyObject* self) {
 
   if (!initialized) {
     ddup_config_env(get_env_or_default("DD_ENV", "prod"));
-    ddup_config_version(get_env_or_default("DD_VERSION", "miniprof_service"));
+    ddup_config_version(get_env_or_default("DD_VERSION", ""));
+    ddup_config_service(get_env_or_default("DD_SERVICE", "miniprof_service"));
     ddup_config_url(get_env_or_default("DD_TRACE_AGENT_URL", "http://localhost:8126"));
     ddup_config_runtime("python");
     ddup_config_runtime_version(Py_GetVersion());
@@ -53,7 +54,7 @@ static PyObject* check_threads(PyObject* self) {
 
         // Push to profiler
         ddup_start_sample(256);
-        ddup_push_walltime(g_period, 1); // could be firmer
+        ddup_push_walltime(g_period * 1e9, 1); // could be firmer
         ddup_push_threadinfo(thread->thread_id, 0, "miniprofiled_thread");
         while (frame) {
             PyCodeObject *code = PyFrame_GetCode(frame);
@@ -78,7 +79,8 @@ static PyObject* check_threads(PyObject* self) {
     PyThread_release_lock(lmutex);
 
     // Check to see if we need to upload
-    if (1 < (counter += g_period)) {
+    if (60 < (counter += g_period)) {
+      printf("Uploading!\n");
       counter = 0;
       ddup_upload();
     }
