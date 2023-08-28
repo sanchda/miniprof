@@ -8,7 +8,7 @@ module = Extension('miniprof.sampler',
                     extra_compile_args=['-O3']
                 )
 setup(name = 'miniprof',
-      version = '0.1',
+      version = '0.2',
       description = 'Profiling I guess',
       ext_modules = [module],
       entry_points={
