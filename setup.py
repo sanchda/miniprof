@@ -20,8 +20,8 @@ module = Extension('miniprof.sampler',
                     extra_compile_args=['-std=c11', '-O3']
                 )
 setup(name = 'miniprof',
-      version = '0.2',
-      description = 'Profiling I guess',
+      version = '0.2.1',
+      description = 'A very small profiler',
       ext_modules = [module],
       entry_points={
           "console_scripts": [

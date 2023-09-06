@@ -20,7 +20,7 @@ else
 fi
 
 # Build ddup into a .so
-g++-11 -std=c++17 -O3 -fPIC \
+g++ -std=c++17 -O3 -fPIC \
   -I$DD_ROOT/libdatadog/include/ \
   -I$DD_ROOT/profiling/include/ \
   $DD_ROOT/profiling/src/* \
