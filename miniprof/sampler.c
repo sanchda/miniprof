@@ -35,7 +35,12 @@ static PyObject* check_threads(PyObject* self) {
   }
   PyInterpreterState *rt_state;
   PyThreadState *thread;
+
+  // TODO should probably check that these could be allocated
   PyObject *thread_tb = PyDict_New();
+  PyObject* running_threads = PyDict_New();
+  PyObject* current_exceptions = PyDict_New();
+
   PyThread_type_lock lmutex = _PyRuntime.interpreters.mutex;
 
   if (PyThread_acquire_lock(lmutex, WAIT_LOCK) == PY_LOCK_ACQUIRED) {
@@ -45,38 +50,96 @@ static PyObject* check_threads(PyObject* self) {
       thread = PyInterpreterState_ThreadHead(rt_state);
 
       while (thread) {
-        // PyThreadState_GetFrame and PyFrame_GetBack both return strong
-        // references, so can manage reference count later the same way
         PyFrameObject *frame = PyThreadState_GetFrame(thread);
         if (!frame)
-            break;
+          break;
 
+        PyObject *thread_id = PyLong_FromUnsignedLong(thread->thread_id);
+        if (thread_id)
+          PyDict_SetItem(running_threads, thread_id, (PyObject *)frame); // unhandled
+        Py_DECREF(thread_id);
+        Py_XDECREF(frame); // give back one strong reference
 
-        // Push to profiler
-        ddup_start_sample(256);
-        ddup_push_walltime(g_period * 1e9, 1); // could be firmer
-        ddup_push_threadinfo(thread->thread_id, 0, "miniprofiled_thread");
-        while (frame) {
-            PyCodeObject *code = PyFrame_GetCode(frame);
-            Py_XDECREF(code);
+        // Now harvest exceptions
+        _PyErr_StackItem* exc_info = _PyErr_GetTopmostException(thread);
+        if (exc_info && exc_info->exc_value && exc_info->exc_value != Py_None) {
+          PyObject *exc_type = (PyObject *)Py_TYPE(exc_info->exc_value);
+          PyObject *exc_tb = PyException_GetTraceback(exc_info->exc_value);
 
-            // Push frameinfo
-            ddup_push_frame(PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_name")),
-                            PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_filename")),
-                            0,
-                            PyFrame_GetLineNumber(frame));
+          if (exc_tb) {
+            PyObject *key = PyLong_FromUnsignedLong(thread->thread_id);
+            PyObject *value = PyTuple_Pack(2, exc_type, exc_tb);
 
-            // Iterate
-            PyFrameObject *prev = PyFrame_GetBack(frame);
-            Py_XDECREF(frame); // give back one strong reference
-            frame = prev;
+            if (key && value)
+              PyDict_SetItem(current_exceptions, key, value);
+
+            Py_XDECREF(key);
+            Py_XDECREF(value);
+          }
+          Py_XDECREF(exc_tb);
         }
-        ddup_flush_sample();
         thread = PyThreadState_Next(thread);
       }
       rt_state = PyInterpreterState_Next(rt_state);
     }
     PyThread_release_lock(lmutex);
+
+    // Stash the wall/cpu data we harvested
+    {
+      PyObject *key, *value;
+      Py_ssize_t pos = 0;
+      while (PyDict_Next(running_threads, &pos, &key, &value)) {
+        ddup_start_sample(256);
+        ddup_push_walltime(g_period * 1e9, 1); // could be firmer
+        ddup_push_cputime(g_period * 1e9, 1); // outright lie
+        ddup_push_threadinfo(PyLong_AsLong(key), 0, "miniprofiled_thread");
+
+        PyFrameObject *frame = (PyFrameObject *)value;
+        while (frame) {
+          PyCodeObject *code = PyFrame_GetCode(frame);
+
+          // Push frameinfo
+          ddup_push_frame(PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_name")),
+                          PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_filename")),
+                          0,
+                          PyFrame_GetLineNumber(frame));
+          Py_XDECREF(code);
+
+          // Iterate
+          PyFrameObject *prev = PyFrame_GetBack(frame);
+          frame = prev;
+        }
+        ddup_flush_sample();
+      }
+    }
+
+    // Stash the exception data
+    {
+      PyObject *key, *value;
+      Py_ssize_t pos = 0;
+      while (PyDict_Next(current_exceptions, &pos, &key, &value)) {
+        ddup_start_sample(256);
+        ddup_push_exceptioninfo("idk lol", 1);
+        ddup_push_threadinfo(PyLong_AsLong(key), 0, "miniprofiled_thread");
+
+        PyFrameObject *frame = (PyFrameObject *)value;
+        while (frame) {
+          PyCodeObject *code = PyFrame_GetCode(frame);
+
+          // Push frameinfo
+          ddup_push_frame(PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_name")),
+                          PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_filename")),
+                          0,
+                          PyFrame_GetLineNumber(frame));
+          Py_XDECREF(code);
+
+          // Iterate
+          PyFrameObject *prev = PyFrame_GetBack(frame);
+          frame = prev;
+        }
+        ddup_flush_sample();
+      }
+    }
 
     // Check to see if we need to upload
     if (60 < (counter += g_period)) {
