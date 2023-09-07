@@ -123,15 +123,20 @@ static PyObject* check_threads(PyObject* self) {
         ddup_push_threadinfo(PyLong_AsLong(key), 0, "miniprofiled_thread");
 
         PyObject *tb = PyTuple_GetItem(value, 1);
-        while (tb) {
+        while (tb && PyTraceBack_Check(tb)) {
           PyFrameObject *frame = (PyFrameObject *)PyObject_GetAttrString(tb, "tb_frame");
+          if (!frame || !PyFrame_Check((PyObject*)frame))
+            continue;
           PyCodeObject *code = PyFrame_GetCode(frame);
+          if (!code || !PyCode_Check(code))
+            continue;
 
           // Push frameinfo
           ddup_push_frame(PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_name")),
                           PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_filename")),
                           0,
                           PyFrame_GetLineNumber(frame));
+          Py_XDECREF(frame);
           Py_XDECREF(code);
 
           // Iterate
