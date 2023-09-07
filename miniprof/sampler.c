@@ -122,8 +122,9 @@ static PyObject* check_threads(PyObject* self) {
         ddup_push_exceptioninfo("idk lol", 1);
         ddup_push_threadinfo(PyLong_AsLong(key), 0, "miniprofiled_thread");
 
-        PyFrameObject *frame = (PyFrameObject *)value;
-        while (frame) {
+        PyObject *tb = PyTuple_GetItem(value, 1);
+        while (tb) {
+          PyFrameObject *frame = (PyFrameObject *)PyObject_GetAttrString(tb, "tb_frame");
           PyCodeObject *code = PyFrame_GetCode(frame);
 
           // Push frameinfo
@@ -134,8 +135,7 @@ static PyObject* check_threads(PyObject* self) {
           Py_XDECREF(code);
 
           // Iterate
-          PyFrameObject *prev = PyFrame_GetBack(frame);
-          frame = prev;
+          tb = PyObject_GetAttrString(tb, "tb_next");
         }
         ddup_flush_sample();
       }
