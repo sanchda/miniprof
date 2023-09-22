@@ -9,10 +9,52 @@
 
 
 const char *get_env_or_default(const char *name, const char *default_value) {
-    char *value = getenv(name);
-    if (value == NULL || strlen(value) == 0)
-        return default_value;
-    return value;
+  char *value = getenv(name);
+  if (value == NULL || strlen(value) == 0)
+    return default_value;
+  return value;
+}
+
+static const char *get_class_name(PyFrameObject *frame) {
+  PyObject *varnames, *value, *name, *clsname;
+  PyCodeObject *code = PyFrame_GetCode(frame);
+
+  if (!code)
+    return "";
+
+  varnames = PyCode_GetVarnames(code);
+  if (!varnames || !PyTuple_Check(varnames) || PyTuple_Size(varnames) <= 0)
+    return "";
+
+  name = PyTuple_GetItem(varnames, 0);  // Borrowed reference, no need to DECREF.
+  if (!name)
+    return "";
+
+  PyObject *locals = PyFrame_GetLocals(frame);
+  if (!locals)
+      return "";
+  value = PyDict_GetItem(locals, name);  // Borrowed reference. No need to DECREF.
+  if (!value)
+    return "";
+
+  if (PyUnicode_CompareWithASCIIString(name, "self") == 0) {
+    value = PyObject_Type(value);  // Gets the type of 'self'
+    if (!value)
+      return "";
+  } else if (PyUnicode_CompareWithASCIIString(name, "cls") != 0) {
+    return "";
+  }
+
+  clsname = PyObject_GetAttrString(value, "__name__");
+  Py_XDECREF(value);  // Safe to DECREF now.
+
+  if (!clsname)
+    return "";
+
+  const char *result = PyUnicode_AsUTF8(clsname);
+  Py_DECREF(clsname);  // DECREF after using.
+
+  return result ? result : "";
 }
 
 const double g_period= 1.0/100.0; // TODO make more firm
@@ -99,6 +141,7 @@ static PyObject* check_threads(PyObject* self) {
           PyCodeObject *code = PyFrame_GetCode(frame);
 
           // Push frameinfo
+          ddup_push_class_name(get_class_name(frame));
           ddup_push_frame(PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_name")),
                           PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_filename")),
                           0,
