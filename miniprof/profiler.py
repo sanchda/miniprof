@@ -11,7 +11,7 @@ def _sample_event():
     print("Profiling started.")
     while True:
         miniprof.sampler.check_threads()
-        time.sleep(1/100)  # 10hz
+        time.sleep(1/1000)  # 1000hz
 
 
 def start():

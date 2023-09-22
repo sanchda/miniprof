@@ -46,8 +46,6 @@ static const char *get_class_name(PyFrameObject *frame) {
   }
 
   clsname = PyObject_GetAttrString(value, "__name__");
-  Py_XDECREF(value);  // Safe to DECREF now.
-
   if (!clsname)
     return "";
 
@@ -137,11 +135,13 @@ static PyObject* check_threads(PyObject* self) {
         ddup_push_threadinfo(PyLong_AsLong(key), 0, "miniprofiled_thread");
 
         PyFrameObject *frame = (PyFrameObject *)value;
+        const char *class_name = get_class_name(frame);
+        if (class_name && *class_name)
+          ddup_push_class_name(get_class_name(frame));
         while (frame) {
           PyCodeObject *code = PyFrame_GetCode(frame);
 
           // Push frameinfo
-          ddup_push_class_name(get_class_name(frame));
           ddup_push_frame(PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_name")),
                           PyUnicode_AsUTF8(PyObject_GetAttrString((PyObject *)code, "co_filename")),
                           0,
